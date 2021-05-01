@@ -20,7 +20,7 @@ client = Client(api_key, api_secret)
 # klines8 = client.get_historical_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_1MINUTE, start_str="1619485859", limit=1000)
 # klines9 = client.get_historical_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_1MINUTE, start_str="1619545859", limit=1000)
 # klines10 = client.get_historical_klines(symbol='BTCUSDT', interval=Client.KLINE_INTERVAL_1MINUTE, start_str="1619605859", limit=1000)
-rawKlines = client.get_klines(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1MINUTE, limit=200)
+rawKlines = client.get_klines(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1MINUTE, limit=1000)
 
 # klines = klines1 + klines2 + klines3 + klines4 + klines5 + klines6 + klines7 + klines8 + klines9 + klines10
 
@@ -47,10 +47,23 @@ for i in rawKlines:
     price = round(float(i[4]), 7 - int(math.floor(math.log10(abs(float(i[4]))))) - 1)
     orginalPrice[i[0]] = price
 
-sevenListF = Algorithm.CalculateMovingAverage(125)
-twentyListF = Algorithm.CalculateMovingAverage(150)
-sevenListS = Algorithm.CalculateMovingAverage(50)
-twentyListS = Algorithm.CalculateMovingAverage(100)
+# 125 150
+sevenListF = Algorithm.CalculateMovingAverage(50)
+twentyListF = Algorithm.CalculateMovingAverage(100)
+sevenListS = Algorithm.CalculateMovingAverage(125)
+twentyListS = Algorithm.CalculateMovingAverage(150)
+
+# sevenListF, twentyListF, sevenListS, twentyListS = [], [], [], []
+# for i, j, k, l in zip(sevenListFDict.values(), twentyListFDict.values(), sevenListSDict.values(), twentyListSDict.values()):
+#     sevenListF.append(i)
+#     twentyListF.append(j)
+#     sevenListS.append(k)
+#     twentyListS.append(l)
+
+for i in range(50):
+    sevenListF.pop(0)
+for i in range(25):
+    sevenListS.pop(0)
 
 binanceClientF = Binance(2000)
 binanceClientS = Binance(2000)
@@ -59,49 +72,117 @@ sevenHigherF = False
 twentyHigherF = False
 
 for i, j in zip(sevenListF, twentyListF):
-    if twentyListF[j] > sevenListF[i]:
+    if j > i:
         twentyHigherF = True
         sevenHigherF = False
-    elif sevenListF[i] > twentyListF[j]:
+    elif i > j:
         sevenHigherF = True
         twentyHigherF = False
+
+sevenHigherS = False
+twentyHigherS = False
+
+for i, j in zip(sevenListS, twentyListS):
+    if j > i:
+        twentyHigherS = True
+        sevenHigherS = False
+    elif i > j:
+        print(str(i) + " > " + str(j))
+        sevenHigherS = True
+        twentyHigherS = False
+
+print("stops")
 
 while True:
     time.sleep(60)
 
-    latestCandle = client.get_klines(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1MINUTE, limit=1)
-    price = round(float(latestCandle[0][4]), 7 - int(math.floor(math.log10(abs(float(latestCandle[0][4]))))) - 1)
-    orginalPrice[latestCandle[0][0]] = price
-    timestamp = latestCandle[0][0]
+    latestCandles = client.get_klines(symbol="BTCUSDT", interval=Client.KLINE_INTERVAL_1MINUTE, limit=1000)
+    price = round(float(latestCandles[-1][4]), 7 - int(math.floor(math.log10(abs(float(latestCandles[-1][4]))))) - 1)
+    orginalPrice[latestCandles[-1][0]] = price
+    timestamp = latestCandles[-1][0]
 
-    Algorithm.AddCandle(latestCandle[0])
-    sevenListF = Algorithm.CalculateMovingAverage(125)
-    twentyListF = Algorithm.CalculateMovingAverage(150)
+    Algorithm.AddCandle(latestCandles)
+
+    sevenListF = []
+    twentyListF = []
+    sevenListF = Algorithm.CalculateMovingAverage(50)
+    twentyListF = Algorithm.CalculateMovingAverage(100)
+
+    sevenListS = []
+    twentyListS = []
+    sevenListS = Algorithm.CalculateMovingAverage(125)
+    twentyListS = Algorithm.CalculateMovingAverage(150)
+
+    for i in range(50):
+        sevenListF.pop(0)
+    for i in range(25):
+        sevenListS.pop(0)
+    
+    date = datetime.fromtimestamp(int(str(timestamp)[:10]))
+    print("For 50 100: Time: " + str(date) + " Seven: " + str(sevenListF[-1]) + " Twenty: " + str(twentyListF[-1]))
+
+    date = datetime.fromtimestamp(int(str(timestamp)[:10]))
+    print("For 125 150: Time: " + str(date) + " Seven: " + str(sevenListS[-1]) + " Twenty: " + str(twentyListS[-1]))
+
+    
 
     sevenHigherFAdded = False
     twentyHigherFAdded = False
 
-    for i, j, k in zip(sevenListF, twentyListF, orginalPrice):
-        if twentyListF[j] > sevenListF[i]:
+    for i, j in zip(sevenListF, twentyListF):
+        if j > i:
             twentyHigherFAdded = True
             sevenHigherFAdded = False
-        elif sevenListF[i] > twentyListF[j]:
+        elif i > j:
             sevenHigherFAdded = True
             twentyHigherFAdded = False
-    
-    print(twentyHigherFAdded)
-    print(sevenHigherFAdded)
-    print(twentyHigherF)
-    print(sevenHigherF)
 
     if twentyHigherFAdded and sevenHigherF:
         sevenHigherF = False
         twentyHigherF = True
-        binanceClientF.Short(orginalPrice[timestamp], timestamp, 1, "F")
+        binanceClientS.Sell(orginalPrice[timestamp], timestamp, 1, " 50, 100")
+        # binanceClientF.Short(orginalPrice[timestamp], timestamp, 1, " 50, 100")
     elif twentyHigherF and sevenHigherFAdded:
         sevenHigherF = True
         twentyHigherF = False
-        binanceClientF.CloseShort(orginalPrice[timestamp], timestamp, "F")
+        if binanceClientF.isBought:
+            binanceClientF.Buy(orginalPrice[timestamp], timestamp, 1, " 50, 100")
+        # if binanceClientF.isShorted:
+        #     binanceClientF.CloseShort(orginalPrice[timestamp], timestamp, " 50, 100")
+
+    print(sevenHigherF)
+    print(twentyHigherF)
+    print(sevenHigherFAdded)
+    print(twentyHigherFAdded)
+
+    sevenHigherSAdded = False
+    twentyHigherSAdded = False
+
+    for i, j in zip(sevenListS, twentyListS):
+        if j > i:
+            twentyHigherSAdded = True
+            sevenHigherSAdded = False
+        elif i > j:
+            sevenHigherSAdded = True
+            twentyHigherSAdded = False
+
+    if twentyHigherSAdded and sevenHigherS:
+        sevenHigherS = False
+        twentyHigherS = True
+        binanceClientS.Sell(orginalPrice[timestamp], timestamp, 1, " 125, 150")
+        # binanceClientS.Short(orginalPrice[timestamp], timestamp, 1, " 125, 150")
+    elif twentyHigherS and sevenHigherFAdded:
+        sevenHigherS = True
+        twentyHigherS = False
+        if binanceClientS.isBought:
+            binanceClientS.Buy(orginalPrice[timestamp], timestamp, 1, " 125, 150")
+        # if binanceClientS.isShorted:
+        #     binanceClientS.CloseShort(orginalPrice[timestamp], timestamp, " 125, 150")
+    print("-------")
+    print(sevenHigherS)
+    print(twentyHigherS)
+    print(sevenHigherSAdded)
+    print(twentyHigherSAdded)
     
     print("Waiting for next action...")
 
